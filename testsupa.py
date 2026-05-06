@@ -1,34 +1,37 @@
 import streamlit as st
 from st_supabase_connection import SupabaseConnection
 
-# Set up the page title
-st.set_page_config(page_title="Supabase Viewer", page_icon="🔍")
+st.set_page_config(page_title="Supabase Viewer")
 
 # Initialize connection
-# On Render, it uses the SUPABASE_URL and SUPABASE_KEY environment variables
 conn = st.connection("supabase", type=SupabaseConnection)
 
 def main():
     st.title("📋 Supabase Table Records")
-    st.write("Fetching rows from the **test** table...")
-
+    
     try:
-        # Query all columns from the 'test' table
-        # We set ttl=0 so that every refresh shows the most recent data
-        res = conn.query("*", table="test", ttl=0).execute()
+        # Use conn.table() directly if the library version supports it, 
+        # or use conn.client for the standard Supabase syntax.
+        # This is the most reliable way to fetch all rows:
+        response = conn.table("test").select("*").execute()
 
-        # Check if data was returned
-        if res.data:
-            st.success(f"Successfully retrieved {len(res.data)} rows.")
-            
-            # Display the data in an interactive table
-            st.dataframe(res.data, use_container_width=True)
+        if response.data:
+            st.success(f"Found {len(response.data)} rows in the 'test' table.")
+            st.dataframe(response.data, use_container_width=True)
         else:
-            st.info("The 'test' table is currently empty.")
+            st.info("The 'test' table is empty.")
 
+    except AttributeError:
+        # Fallback if the wrapper structure is different in your environment
+        st.error("Connection attribute error. Trying fallback method...")
+        try:
+            response = conn.client.table("test").select("*").execute()
+            st.dataframe(response.data)
+        except Exception as e:
+            st.error(f"Fallback failed: {e}")
+            
     except Exception as e:
-        st.error("An error occurred while fetching data.")
-        st.exception(e)
+        st.error(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()
